@@ -4,6 +4,7 @@ import { MotionBlock, MotionSection } from "@/components/ui/page-transition";
 import SiteHeader from "@/components/ui/SiteHeader";
 import { NavigationLink, useNavigationLoader } from "@/components/ui/navigation-loader";
 import PasswordField from "@/components/ui/PasswordField";
+import { formatAuthErrorMessage } from "@/lib/auth-feedback";
 import { getSupabaseClient, supabaseConfigErrorMessage } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -33,16 +34,6 @@ export default function ResetPasswordForm() {
     const client = supabaseClient;
 
     async function checkRecoveryState() {
-      const hasRecoveryHash = window.location.hash.includes("access_token");
-
-      if (hasRecoveryHash) {
-        if (isMounted) {
-          setIsReady(true);
-          setIsCheckingRecovery(false);
-        }
-        return;
-      }
-
       const { data } = await client.auth.getSession();
 
       if (isMounted) {
@@ -53,8 +44,28 @@ export default function ResetPasswordForm() {
 
     void checkRecoveryState();
 
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) {
+        return;
+      }
+
+      if (event === "PASSWORD_RECOVERY" || Boolean(session)) {
+        setIsReady(true);
+        setIsCheckingRecovery(false);
+        return;
+      }
+
+      if (event === "SIGNED_OUT") {
+        setIsReady(false);
+        setIsCheckingRecovery(false);
+      }
+    });
+
     return () => {
       isMounted = false;
+      subscription.unsubscribe();
     };
   }, [hasSupabaseClient]);
 
@@ -88,14 +99,15 @@ export default function ResetPasswordForm() {
     setIsPending(false);
 
     if (updateError) {
-      setError(updateError.message);
+      setError(formatAuthErrorMessage(updateError));
       return;
     }
 
     setSuccess("Password updated. Redirecting to login.");
+    await client.auth.signOut();
     startLoading("Opening login");
     window.setTimeout(() => {
-      router.push("/login");
+      router.push("/login?reset=success");
     }, 300);
   }
 

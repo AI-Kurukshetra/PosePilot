@@ -3,6 +3,7 @@
 import { MotionBlock, MotionSection } from "@/components/ui/page-transition";
 import SiteHeader from "@/components/ui/SiteHeader";
 import { NavigationLink } from "@/components/ui/navigation-loader";
+import { formatAuthErrorMessage, getAuthRedirectUrl } from "@/lib/auth-feedback";
 import { getSupabaseClient, supabaseConfigErrorMessage } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { useState, type FormEvent } from "react";
@@ -26,20 +27,16 @@ export default function ForgotPasswordForm() {
     }
 
     setIsPending(true);
+    const normalizedEmail = email.trim();
 
-    const redirectTo =
-      typeof window === "undefined"
-        ? undefined
-        : `${window.location.origin}/reset-password`;
-
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo,
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: getAuthRedirectUrl("/reset-password"),
     });
 
     setIsPending(false);
 
     if (resetError) {
-      setError(resetError.message);
+      setError(formatAuthErrorMessage(resetError));
       return;
     }
 

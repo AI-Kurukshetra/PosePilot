@@ -4,6 +4,7 @@ import { MotionBlock, MotionSection } from "@/components/ui/page-transition";
 import { NavigationLink, useNavigationLoader } from "@/components/ui/navigation-loader";
 import SiteHeader from "@/components/ui/SiteHeader";
 import PasswordField from "@/components/ui/PasswordField";
+import { formatAuthErrorMessage, getAuthRedirectUrl } from "@/lib/auth-feedback";
 import { getSupabaseClient, supabaseConfigErrorMessage } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -55,11 +56,21 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const loginStatusMessage =
+    mode === "login"
+      ? searchParams.get("reset") === "success"
+        ? "Password updated. Sign in with your new password."
+        : searchParams.get("confirmed") === "1"
+          ? "Email confirmed. You can sign in now."
+          : null
+      : null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setSuccess(null);
 
     if (!supabase) {
       setError(supabaseConfigErrorMessage);
@@ -67,16 +78,29 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
     }
 
     setIsPending(true);
+    const normalizedEmail = email.trim();
 
     const response =
       mode === "login"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        ? await supabase.auth.signInWithPassword({ email: normalizedEmail, password })
+        : await supabase.auth.signUp({
+            email: normalizedEmail,
+            password,
+            options: {
+              emailRedirectTo: getAuthRedirectUrl("/dashboard"),
+            },
+          });
 
     setIsPending(false);
 
     if (response.error) {
-      setError(response.error.message);
+      setError(formatAuthErrorMessage(response.error));
+      return;
+    }
+
+    if (mode === "signup" && !response.data.session) {
+      setPassword("");
+      setSuccess("Account created. Check your email to confirm your account before logging in.");
       return;
     }
 
@@ -184,6 +208,12 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
               {error ? (
                 <p className="mb-4 rounded-2xl border border-[#ff4c4c]/30 bg-[#ff4c4c]/10 px-4 py-3 text-sm text-[#ff9a9a]">
                   {error}
+                </p>
+              ) : null}
+
+              {success ?? loginStatusMessage ? (
+                <p className="mb-4 rounded-2xl border border-[#00E676]/30 bg-[#00E676]/10 px-4 py-3 text-sm text-[#CFFFE4]">
+                  {success ?? loginStatusMessage}
                 </p>
               ) : null}
 
