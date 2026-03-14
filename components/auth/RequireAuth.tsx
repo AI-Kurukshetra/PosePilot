@@ -1,11 +1,12 @@
 "use client";
 
 import { clearAllPendingPracticeSessions } from "@/lib/practice-sessions";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient, supabaseConfigErrorMessage } from "@/lib/supabase";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 export default function RequireAuth({ children }: { children: ReactNode }) {
+  const hasSupabaseClient = Boolean(getSupabaseClient());
   const router = useRouter();
   const pathname = usePathname();
   const [isReady, setIsReady] = useState(false);
@@ -17,11 +18,18 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    const supabaseClient = getSupabaseClient();
+
+    if (!supabaseClient) {
+      return;
+    }
+
+    const client = supabaseClient;
 
     async function checkSession() {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await client.auth.getUser();
 
       if (!isMounted) {
         return;
@@ -41,7 +49,7 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = client.auth.onAuthStateChange(async (_event, session) => {
       if (!session) {
         clearAllPendingPracticeSessions();
         setIsReady(false);
@@ -56,7 +64,20 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [loginHref, router]);
+  }, [hasSupabaseClient, loginHref, router]);
+
+  if (!hasSupabaseClient) {
+    return (
+      <div className="page-grid flex min-h-screen items-center justify-center px-6 py-10">
+        <div className="max-w-md rounded-[26px] border border-[#D4AF37]/20 bg-black/35 px-6 py-5 text-center">
+          <p className="text-xs uppercase tracking-[0.3em] text-[#D4AF37]">PosePilot</p>
+          <p className="mt-3 text-sm leading-6 text-white/66">
+            {supabaseConfigErrorMessage}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isReady) {
     return (

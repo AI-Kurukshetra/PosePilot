@@ -3,11 +3,13 @@
 import { MotionBlock, MotionSection } from "@/components/ui/page-transition";
 import SiteHeader from "@/components/ui/SiteHeader";
 import { NavigationLink } from "@/components/ui/navigation-loader";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient, supabaseConfigErrorMessage } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { useState, type FormEvent } from "react";
 
 export default function ForgotPasswordForm() {
+  const supabase = getSupabaseClient();
+  const authUnavailableMessage = !supabase ? supabaseConfigErrorMessage : null;
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -17,6 +19,12 @@ export default function ForgotPasswordForm() {
     event.preventDefault();
     setError(null);
     setSuccess(null);
+
+    if (!supabase) {
+      setError(supabaseConfigErrorMessage);
+      return;
+    }
+
     setIsPending(true);
 
     const redirectTo =
@@ -94,6 +102,12 @@ export default function ForgotPasswordForm() {
                 />
               </label>
 
+              {authUnavailableMessage ? (
+                <p className="mb-5 rounded-2xl border border-[#ff4c4c]/30 bg-[#ff4c4c]/10 px-4 py-3 text-sm text-[#ff9a9a]">
+                  {authUnavailableMessage}
+                </p>
+              ) : null}
+
               {error ? (
                 <p className="mb-5 rounded-2xl border border-[#ff4c4c]/30 bg-[#ff4c4c]/10 px-4 py-3 text-sm text-[#ff9a9a]">
                   {error}
@@ -110,7 +124,7 @@ export default function ForgotPasswordForm() {
                 type="submit"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.99 }}
-                disabled={isPending}
+                disabled={isPending || !supabase}
                 className="w-full rounded-full bg-[#D4AF37] px-5 py-3.5 text-sm font-medium uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isPending ? "Sending link" : "Send reset link"}

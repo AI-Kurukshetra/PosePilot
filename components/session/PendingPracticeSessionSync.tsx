@@ -1,6 +1,6 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import {
   clearPendingPracticeSessions,
   getPendingPracticeSessions,
@@ -20,6 +20,13 @@ export default function PendingPracticeSessionSync({
     }
 
     hasSyncedRef.current = true;
+    const supabaseClient = getSupabaseClient();
+
+    if (!supabaseClient) {
+      return;
+    }
+
+    const client = supabaseClient;
 
     async function syncPendingSessions() {
       const pendingSessions = getPendingPracticeSessions();
@@ -30,7 +37,7 @@ export default function PendingPracticeSessionSync({
 
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await client.auth.getUser();
 
       if (!user) {
         return;
@@ -48,7 +55,7 @@ export default function PendingPracticeSessionSync({
         created_at: session.created_at,
       }));
 
-      const { error } = await supabase.from("practice_sessions").insert(rows);
+      const { error } = await client.from("practice_sessions").insert(rows);
 
       if (error) {
         return;

@@ -4,7 +4,7 @@ import { MotionBlock, MotionSection } from "@/components/ui/page-transition";
 import { NavigationLink, useNavigationLoader } from "@/components/ui/navigation-loader";
 import SiteHeader from "@/components/ui/SiteHeader";
 import PasswordField from "@/components/ui/PasswordField";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient, supabaseConfigErrorMessage } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -47,6 +47,8 @@ const authCopy: Record<
 
 export default function AuthForm({ mode }: { mode: AuthMode }) {
   const copy = authCopy[mode];
+  const supabase = getSupabaseClient();
+  const authUnavailableMessage = !supabase ? supabaseConfigErrorMessage : null;
   const router = useRouter();
   const searchParams = useSearchParams();
   const { startLoading } = useNavigationLoader();
@@ -58,6 +60,12 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (!supabase) {
+      setError(supabaseConfigErrorMessage);
+      return;
+    }
+
     setIsPending(true);
 
     const response =
@@ -167,6 +175,12 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
                 </div>
               ) : null}
 
+              {authUnavailableMessage ? (
+                <p className="mb-4 rounded-2xl border border-[#ff4c4c]/30 bg-[#ff4c4c]/10 px-4 py-3 text-sm text-[#ff9a9a]">
+                  {authUnavailableMessage}
+                </p>
+              ) : null}
+
               {error ? (
                 <p className="mb-4 rounded-2xl border border-[#ff4c4c]/30 bg-[#ff4c4c]/10 px-4 py-3 text-sm text-[#ff9a9a]">
                   {error}
@@ -177,7 +191,7 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
                 type="submit"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.99 }}
-                disabled={isPending}
+                disabled={isPending || !supabase}
                 className="w-full rounded-full bg-[#D4AF37] px-5 py-3.5 text-sm font-medium uppercase tracking-[0.14em] text-black disabled:cursor-not-allowed disabled:opacity-70 sm:tracking-[0.18em]"
               >
                 {isPending ? "Please wait" : copy.button}

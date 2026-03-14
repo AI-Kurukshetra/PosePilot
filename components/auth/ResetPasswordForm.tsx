@@ -4,12 +4,14 @@ import { MotionBlock, MotionSection } from "@/components/ui/page-transition";
 import SiteHeader from "@/components/ui/SiteHeader";
 import { NavigationLink, useNavigationLoader } from "@/components/ui/navigation-loader";
 import PasswordField from "@/components/ui/PasswordField";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient, supabaseConfigErrorMessage } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 export default function ResetPasswordForm() {
+  const hasSupabaseClient = Boolean(getSupabaseClient());
+  const authUnavailableMessage = !hasSupabaseClient ? supabaseConfigErrorMessage : null;
   const router = useRouter();
   const { startLoading } = useNavigationLoader();
   const [password, setPassword] = useState("");
@@ -18,10 +20,17 @@ export default function ResetPasswordForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [isCheckingRecovery, setIsCheckingRecovery] = useState(true);
+  const [isCheckingRecovery, setIsCheckingRecovery] = useState(hasSupabaseClient);
 
   useEffect(() => {
     let isMounted = true;
+    const supabaseClient = getSupabaseClient();
+
+    if (!supabaseClient) {
+      return;
+    }
+
+    const client = supabaseClient;
 
     async function checkRecoveryState() {
       const hasRecoveryHash = window.location.hash.includes("access_token");
@@ -34,7 +43,7 @@ export default function ResetPasswordForm() {
         return;
       }
 
-      const { data } = await supabase.auth.getSession();
+      const { data } = await client.auth.getSession();
 
       if (isMounted) {
         setIsReady(Boolean(data.session));
@@ -47,12 +56,18 @@ export default function ResetPasswordForm() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [hasSupabaseClient]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setSuccess(null);
+    const supabaseClient = getSupabaseClient();
+
+    if (!supabaseClient) {
+      setError(supabaseConfigErrorMessage);
+      return;
+    }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
@@ -66,7 +81,9 @@ export default function ResetPasswordForm() {
 
     setIsPending(true);
 
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    const client = supabaseClient;
+
+    const { error: updateError } = await client.auth.updateUser({ password });
 
     setIsPending(false);
 
@@ -148,6 +165,12 @@ export default function ResetPasswordForm() {
                 </>
               )}
 
+              {authUnavailableMessage ? (
+                <p className="mb-5 rounded-2xl border border-[#ff4c4c]/30 bg-[#ff4c4c]/10 px-4 py-3 text-sm text-[#ff9a9a]">
+                  {authUnavailableMessage}
+                </p>
+              ) : null}
+
               {error ? (
                 <p className="mb-5 rounded-2xl border border-[#ff4c4c]/30 bg-[#ff4c4c]/10 px-4 py-3 text-sm text-[#ff9a9a]">
                   {error}
@@ -164,7 +187,7 @@ export default function ResetPasswordForm() {
                 type="submit"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.99 }}
-                disabled={isPending || !isReady}
+                disabled={isPending || !isReady || !hasSupabaseClient}
                 className="w-full rounded-full bg-[#D4AF37] px-5 py-3.5 text-sm font-medium uppercase tracking-[0.2em] text-black disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isPending ? "Updating password" : "Update password"}

@@ -2,7 +2,7 @@
 
 import LogoutButton from "@/components/auth/LogoutButton";
 import { NavigationLink } from "@/components/ui/navigation-loader";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -13,19 +13,27 @@ export default function SiteHeader({
   className?: string;
   hideGuestActions?: boolean;
 }) {
+  const hasSupabaseClient = Boolean(getSupabaseClient());
   const pathname = usePathname();
   const router = useRouter();
   const [hasUser, setHasUser] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(!hasSupabaseClient);
   const isLiveSessionRoute = pathname.startsWith("/session/") && pathname.endsWith("/live");
 
   useEffect(() => {
     let isMounted = true;
+    const supabaseClient = getSupabaseClient();
+
+    if (!supabaseClient) {
+      return;
+    }
+
+    const client = supabaseClient;
 
     async function loadUser() {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await client.auth.getUser();
 
       if (!isMounted) {
         return;
@@ -39,7 +47,7 @@ export default function SiteHeader({
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = client.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) {
         return;
       }
@@ -52,7 +60,7 @@ export default function SiteHeader({
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [hasSupabaseClient]);
 
   useEffect(() => {
     if (!isReady || !hasUser) {
@@ -72,11 +80,7 @@ export default function SiteHeader({
   }
 
   return (
-    <header
-      className={
-        className ?? ""
-      }
-    >
+    <header className={className ?? ""}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <NavigationLink
           href="/"

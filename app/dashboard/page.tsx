@@ -14,7 +14,7 @@ import {
   formatRelativeSessionTime,
   type PracticeSessionRow,
 } from "@/lib/practice-sessions";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
@@ -25,15 +25,26 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let isMounted = true;
+    const supabaseClient = getSupabaseClient();
+
+    const client = supabaseClient;
 
     async function loadDashboard() {
       if (isMounted) {
         setIsLoadingData(true);
       }
 
+      if (!client) {
+        if (isMounted) {
+          setSessions([]);
+          setIsLoadingData(false);
+        }
+        return;
+      }
+
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await client.auth.getUser();
 
       if (!user) {
         if (isMounted) {
@@ -43,7 +54,7 @@ export default function DashboardPage() {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from("practice_sessions")
         .select(
           "id, pose_key, pose_name, alignment_score, duration_seconds, status, summary, region_feedback, created_at"

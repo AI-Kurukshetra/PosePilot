@@ -1,5 +1,5 @@
 import { clearAllPendingPracticeSessions } from "@/lib/practice-sessions";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 
 let logoutPromise: Promise<void> | null = null;
 
@@ -9,6 +9,13 @@ export async function performLogout() {
   }
 
   logoutPromise = (async () => {
+    const supabase = getSupabaseClient();
+
+    if (!supabase) {
+      clearAllPendingPracticeSessions();
+      return;
+    }
+
     const { error } = await supabase.auth.signOut();
 
     if (error) {
